@@ -1,6 +1,12 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends
-from pydantic import BaseModel
-from starlette.concurrency import run_in_threadpool
+try:
+    from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends
+    from pydantic import BaseModel
+    from starlette.concurrency import run_in_threadpool
+except ImportError as exc:  # pragma: no cover - exercised only without [api]
+    raise ImportError(
+        'The TelePress API server needs optional dependencies. '
+        'Install them with: pip install "telepress[api]"'
+    ) from exc
 from typing import Optional
 import os
 import shutil
