@@ -41,7 +41,7 @@ dependencies = [
 [project.optional-dependencies]
 api = [
   "fastapi>=0.110",
-  "python-multipart>=0.0.9",
+  "python-multipart>=0.0.32",
   "uvicorn>=0.29",
 ]
 s3 = [
@@ -58,7 +58,7 @@ dev = [
   "numpy>=1.26",
   "pytest>=8",
   "pytest-cov>=5",
-  "python-multipart>=0.0.9",
+  "python-multipart>=0.0.32",
   "PyYAML>=6",
   "twine>=5",
   "uvicorn>=0.29",
