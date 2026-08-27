@@ -46,7 +46,7 @@ class TestRcloneHost(unittest.TestCase):
                 remote_path='remote:bucket',
                 public_url='https://example.com'
             )
-        self.assertIn('rclone executable not found', str(ctx.exception))
+        self.assertIn('rclone executable not found', str(ctx.exception).lower())
 
     @patch('subprocess.run')
     def test_upload_batch_success(self, mock_run):

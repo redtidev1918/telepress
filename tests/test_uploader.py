@@ -45,11 +45,14 @@ class TestImageUploaderInit(unittest.TestCase):
     
     @patch('telepress.uploader.create_image_host')
     def test_init_from_config(self, mock_create):
-        """Test initialization from config when no host specified."""
+        """Test configuration is loaded lazily when no host is specified."""
         mock_host = MockImageHost()
         mock_create.return_value = mock_host
         
         uploader = ImageUploader()
+        mock_create.assert_not_called()
+
+        self.assertIs(uploader.host, mock_host)
         mock_create.assert_called_once_with(None)
     
     def test_init_custom_max_workers(self):

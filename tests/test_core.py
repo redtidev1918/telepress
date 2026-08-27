@@ -463,8 +463,8 @@ class TestFileValidation(unittest.TestCase):
             os.unlink(tmp_path)
 
     def test_file_too_large(self):
-        """Test that files over 100MB raise ValidationError."""
-        with patch('os.path.getsize', return_value=150 * 1024 * 1024):  # 150MB
+        """Test that files over the 2GB safety limit raise ValidationError."""
+        with patch('os.path.getsize', return_value=3 * 1024 * 1024 * 1024):
             with patch('os.path.exists', return_value=True):
                 with self.assertRaises(ValidationError) as ctx:
                     self.publisher.publish('/fake/large.md', title="Test")
@@ -1073,4 +1073,3 @@ class TestPublishOptimizedGallery(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-

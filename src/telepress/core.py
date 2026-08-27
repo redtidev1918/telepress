@@ -136,7 +136,23 @@ class TelegraphPublisher(IPublisher):
             config_workers = config.get('image_host', {}).get('max_workers')
             max_workers = int(config_workers) if config_workers else 4
 
-        self.uploader = ImageUploader(max_workers=max_workers)
+        # Image hosts may require credentials or optional dependencies.  Text-only
+        # publishing should not pay that initialization cost (or require an image
+        # host configuration), so create the uploader only when it is first used.
+        self._max_workers = max_workers
+        self._uploader = None
+
+    @property
+    def uploader(self) -> ImageUploader:
+        """Return the lazily initialized image uploader."""
+        if self._uploader is None:
+            self._uploader = ImageUploader(max_workers=self._max_workers)
+        return self._uploader
+
+    @uploader.setter
+    def uploader(self, value: ImageUploader):
+        """Allow callers to inject a configured or test uploader."""
+        self._uploader = value
 
     def publish(self, file_path: str, title: Optional[str] = None) -> str:
         """
@@ -154,7 +170,7 @@ class TelegraphPublisher(IPublisher):
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"File not found: {file_path}")
 
-        # Safety check for huge files (2GB)
+        # Reject unexpectedly large inputs before reading or extracting them.
         validate_file_size(file_path, 2048 * 1024 * 1024, "File too large")
 
         file_name = os.path.basename(file_path)

@@ -210,12 +210,15 @@ def configure_wizard():
 def handle_publish(args):
     """Handle publish command."""
     try:
-        publisher = TelegraphPublisher(
+        publisher_options = dict(
             token=args.token, 
             image_size_limit=args.image_size_limit,
-            auto_compress=not args.no_compress,
-            api_url=getattr(args, 'api_url', None)
+            auto_compress=not args.no_compress
         )
+        api_url = getattr(args, 'api_url', None)
+        if api_url:
+            publisher_options['api_url'] = api_url
+        publisher = TelegraphPublisher(**publisher_options)
         url = publisher.publish(args.file, title=args.title)
         print(f"\n✅ Success! Page created: {url}")
     except TelePressError as e:

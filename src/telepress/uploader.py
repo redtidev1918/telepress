@@ -86,10 +86,27 @@ class ImageUploader:
             >>> ImageUploader('custom', upload_url='https://...', response_url_path='data.url')
         """
         if isinstance(host, ImageHost):
-            self.host = host
+            self._host = host
+            self._host_name = None
+            self._host_config = {}
         else:
-            self.host = create_image_host(host, **host_config)
+            # Configuration loading can fail for text-only users. Defer it until
+            # the host is actually accessed by an image upload operation.
+            self._host = None
+            self._host_name = host
+            self._host_config = host_config
         self.max_workers = max_workers
+
+    @property
+    def host(self) -> ImageHost:
+        """Return the configured host, loading it on first use."""
+        if self._host is None:
+            self._host = create_image_host(self._host_name, **self._host_config)
+        return self._host
+
+    @host.setter
+    def host(self, value: ImageHost):
+        self._host = value
 
     def upload(
         self, 
