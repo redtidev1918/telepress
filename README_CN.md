@@ -1,233 +1,219 @@
 # TelePress
 
+[![CI](https://github.com/redtidev1918/telepress/actions/workflows/ci.yml/badge.svg)](https://github.com/redtidev1918/telepress/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/telepress.svg)](https://pypi.org/project/telepress/)
+[![Python](https://img.shields.io/pypi/pyversions/telepress.svg)](https://pypi.org/project/telepress/)
+
 [English](README.md)
 
-把 Markdown、图片、Zip 压缩包发布到 [Telegraph](https://telegra.ph)。大文件会自动分页并生成导航链接。
+TelePress 用于把 Markdown、纯文本、图片和 ZIP 图集发布到
+[Telegraph](https://telegra.ph)，支持自动分页、外部图床、图片压缩、并发上传和可选的 REST API。
+
+## 环境要求
+
+- Python 3.10 或更高版本
+- Telegraph token；首次使用时也可以自动创建
+- 只有发布图片或图集时才需要配置图床
 
 ## 安装
 
 ```bash
 pip install telepress
 
-# 需要 REST API
-pip install telepress[api]
+# 可选：REST API
+pip install "telepress[api]"
 
-# 从源码安装
-git clone https://github.com/zoidberg-xgd/telepress
-cd telepress && pip install -e .
+# 可选：AWS S3、Cloudflare R2 等 S3 兼容图床
+pip install "telepress[s3]"
+
+# 可选：YAML 配置文件
+pip install "telepress[yaml]"
 ```
 
-## 用法
+从源码安装开发环境：
 
-CLI 配置向导:
 ```bash
-telepress configure
+git clone https://github.com/redtidev1918/telepress.git
+cd telepress
+python -m pip install --editable ".[dev]"
 ```
 
-检查配置是否正确:
-```bash
-telepress check
-```
+## 快速开始
 
-发布内容:
+发布文档：
+
 ```bash
 telepress article.md --title "我的文章"
 
-# 调整图片大小限制为 10MB
-telepress article.md --image-size-limit 10
-
-# 关闭自动压缩
-telepress article.md --no-compress
+# 显式子命令写法与上面等价
+telepress publish article.md --title "我的文章"
 ```
 
-REST API:
-```bash
-telepress-server --port 8000
+配置图床后发布图片或 ZIP 图集：
 
-curl -X POST localhost:8000/publish/text \
-  -H "Content-Type: application/json" \
-  -d '{"content": "# 标题\n\n正文", "title": "测试"}'
-```
-
-## 原理
-
-文本文件转成 Telegraph 格式（支持 Markdown）。纯文本的换行会保留为段落。内容太长的话按 ~10KB 切分成多页，自动加上下一页链接。
-
-首次运行会自动创建 Telegraph 账号，token 存在 `~/.telegraph_token`。
-
-## 特性
-
-- **外部图床**: 支持 imgbb、imgur、sm.ms、Cloudflare R2、Rclone
-- **Rclone 集成**: 高性能批量上传（需[手动安装 Rclone](https://rclone.org/downloads/)）
-- **智能文本优化**: 自动识别小说章节（第X章、Chapter X等），优化段落排版
-- **自动压缩**: 超过 5MB 的图片自动压缩（可配置）
-- **批量上传**: 多线程并发上传，带进度回调
-- **去重**: 相同内容不会重复上传
-- **自动分页**: 大内容自动分割成多个链接页面
-
-## 限制
-
-- Telegraph 直接上传不可用，改用外部图床
-- 单张图片默认 5MB（超过自动压缩，可通过 `--image-size-limit` 调整或 `--no-compress` 关闭）
-
-支持: `.txt` `.md` `.markdown` `.rst` `.jpg` `.png` `.gif` `.webp` `.zip`
-
-## 图片上传
-
-支持图床: **imgbb**, **imgur**, **sm.ms**, **S3/R2/OSS**, **Rclone**, **自定义 API**
-
-### 配置
-
-使用配置向导:
 ```bash
 telepress configure
+telepress check
+telepress photo.jpg --title "照片"
+telepress gallery.zip --title "图集"
 ```
 
-安装 Rclone (如需使用):
+常用参数：
+
 ```bash
-telepress install-rclone
+# 临时覆盖图片大小限制，单位 MiB
+telepress gallery.zip --image-size-limit 10
+
+# 不压缩超限图片
+telepress gallery.zip --no-compress
+
+# 使用兼容 Telegraph 的自定义 API
+telepress article.md --api-url http://localhost:9009
 ```
 
-或者手动创建 `~/.telepress.json`:
+纯文本发布不会加载或要求图床配置。Telegraph token 会在需要时自动创建并保存到
+`~/.telegraph_token`，也可以用 `--token` 显式传入。
 
-```json
-{
-    "image_host": {
-        "type": "rclone",
-        "remote_path": "myremote:bucket/path",
-        "public_url": "https://pub.r2.dev/path",
-        "rclone_flags": ["--transfers=32", "--checkers=32"],
-        "max_size_mb": 20
-    }
-}
-```
+## REST API
 
-### 其他示例
+使用前先安装可选 API 依赖：`pip install "telepress[api]"`。
 
-**ImgBB / Imgur:**
-```json
-{
-    "image_host": {
-        "type": "imgur",
-        "client_id": "你的_client_id",
-        "max_size_mb": 10,
-        "max_workers": 8
-    }
-}
-```
-
-或者使用 S3/R2:
-
-```json
-{
-    "image_host": {
-        "type": "s3",
-        "access_key_id": "your_access_key",
-        "secret_access_key": "your_secret_key",
-        "bucket": "your_bucket",
-        "public_url": "https://your-bucket.s3.amazonaws.com",
-        "endpoint_url": "https://s3.us-west-1.amazonaws.com",
-        "region_name": "us-west-1"
-    }
-}
-```
-
-或者使用环境变量:
 ```bash
-export TELEPRESS_IMAGE_HOST_TYPE=rclone
-export TELEPRESS_IMAGE_HOST_REMOTE_PATH=myremote:bucket/path
-export TELEPRESS_IMAGE_HOST_PUBLIC_URL=https://pub.r2.dev/path
+telepress-server --host 127.0.0.1 --port 8000
 ```
 
-### 使用
+OpenAPI 交互文档位于 `http://127.0.0.1:8000/docs`。
+
+```bash
+curl -X POST http://127.0.0.1:8000/publish/text \
+  -H "Content-Type: application/json" \
+  -d '{"content":"# 标题\n\n正文","title":"示例"}'
+
+curl -X POST http://127.0.0.1:8000/publish/file \
+  -F "file=@article.md" \
+  -F "title=示例"
+```
+
+文件读写、图片压缩和同步网络请求会在线程池执行，不会阻塞 API 的异步事件循环。
+
+## 图片托管
+
+支持的图床：
+
+- ImgBB
+- Imgur
+- sm.ms
+- AWS S3、Cloudflare R2、OSS、MinIO 等 S3 兼容存储
+- Rclone remote
+- 自定义 HTTP 上传 API
+
+运行 `telepress configure` 可以交互式配置，也可以创建 `~/.telepress.json`：
+
+```json
+{
+  "image_host": {
+    "type": "rclone",
+    "remote_path": "myremote:bucket/path",
+    "public_url": "https://cdn.example.com/path",
+    "rclone_flags": ["--transfers=32", "--checkers=32"],
+    "max_size_mb": 20,
+    "max_workers": 8
+  }
+}
+```
+
+S3 兼容配置：
+
+```json
+{
+  "image_host": {
+    "type": "s3",
+    "access_key_id": "your-access-key",
+    "secret_access_key": "your-secret-key",
+    "bucket": "your-bucket",
+    "public_url": "https://cdn.example.com",
+    "endpoint_url": "https://s3.example.com",
+    "region_name": "auto"
+  }
+}
+```
+
+环境变量的优先级高于配置文件：
+
+```bash
+export TELEPRESS_IMAGE_HOST_TYPE=imgbb
+export TELEPRESS_IMAGE_HOST_API_KEY=your-key
+```
+
+配置文件查找顺序：
+
+1. 传给 `load_config()` 的显式路径
+2. `TELEPRESS_CONFIG`
+3. `~/.telepress.json`、`~/.telepress.yaml`、`~/.telepress.yml`
+4. `~/.config/telepress.json`
+
+## Python API
+
+```python
+from telepress import TelegraphPublisher, publish, publish_text
+
+url = publish("article.md", title="我的文章")
+text_url = publish_text("# 标题\n\n正文", title="示例")
+
+publisher = TelegraphPublisher(image_size_limit=10)
+gallery_url = publisher.publish("gallery.zip", title="图集")
+```
+
+直接上传图片：
 
 ```python
 from telepress import ImageUploader
 
-# 从配置文件加载
-uploader = ImageUploader()  # 自动读取 ~/.telepress.json
+uploader = ImageUploader("imgbb", api_key="your-key")
+url = uploader.upload("photo.jpg")
 
-# 或者显式指定
-uploader = ImageUploader('imgbb', api_key='your_key')
-uploader = ImageUploader('r2', access_key_id='...', secret_access_key='...', bucket='...', public_url='...')
-
-# 自定义 API
-uploader = ImageUploader('custom',
-    upload_url='https://your-api.com/upload',
-    headers={'Authorization': 'Bearer xxx'},
-    response_url_path='data.url'  # 响应中 URL 的 JSON 路径
-)
-
-# 上传
-url = uploader.upload('photo.jpg')
-
-# 批量上传
-results = uploader.upload_batch(image_paths)
-print(f"成功率: {results.success_rate:.0%}")
+batch = uploader.upload_batch(["1.jpg", "2.jpg"])
+print(batch.success_rate, batch.get_url_map())
 ```
 
-## 图片压缩
+## 行为与限制
 
-```python
-from telepress import compress_image_to_size, MAX_IMAGE_SIZE
+- Markdown 和纯文本会转换为 Telegraph DOM 节点。
+- 可以识别 `Chapter 1`、`第一章` 等纯文本章节标题。
+- 大文本会在约 10,000 字符边界自动分页，并生成上一页、下一页导航。
+- 图集每 100 张图片分页。
+- 单张图片默认限制为 5 MiB，超限时自动压缩；GIF 不会自动压缩。
+- 处理前会应用 2 GiB 的输入安全上限。
+- 默认使用 `~/.telepress_cache.json` 避免重复发布相同文本。
 
-# 压缩到 5MB 以下
-compressed_path, was_compressed = compress_image_to_size(
-    "large_photo.png",
-    max_size=MAX_IMAGE_SIZE,
-    prefer_webp=False  # True 输出 WebP
-)
-```
-
-## 项目结构
-
-```
-telepress/
-├── core.py       # TelegraphPublisher 主类
-├── image_host.py # 外部图床 (imgbb, imgur, smms)
-├── uploader.py   # ImageUploader 批量上传
-├── utils.py      # 压缩工具
-├── server.py     # FastAPI 服务
-└── cli.py        # 命令行
-```
+支持 `.txt`、`.md`、`.markdown`、`.rst`、`.text`、`.jpg`、`.jpeg`、
+`.png`、`.gif`、`.webp`、`.bmp` 和 `.zip`。
 
 ## 错误处理
 
 ```python
-from telepress import publish, ValidationError, TelePressError
+from telepress import TelePressError, ValidationError, publish
 
 try:
-    url = publish("file.md")
-except ValidationError as e:
-    # 输入有问题：格式不对、文件太大等
-    print(e)
-except TelePressError as e:
-    # 其他错误：上传失败、认证失败等
-    print(e)
+    url = publish("article.md")
+except ValidationError as exc:
+    print(f"输入无效：{exc}")
+except TelePressError as exc:
+    print(f"发布失败：{exc}")
 ```
 
-## 集成到其他项目
-
-```python
-# Flask
-@app.route('/publish', methods=['POST'])
-def api_publish():
-    url = publish_text(request.json['content'], title=request.json['title'])
-    return {'url': url}
-
-# 异步
-async def async_publish(content, title):
-    return await asyncio.to_thread(publish_text, content, title)
-```
-
-## 开发
+## 开发与发版
 
 ```bash
-git clone https://github.com/zoidberg-xgd/telepress
-cd telepress && pip install -e .[dev]
-pytest tests/ -v
+python -m pip install --editable ".[dev]"
+python -m pytest --cov
+python -m build
+python -m twine check dist/*
 ```
+
+贡献规范见 [CONTRIBUTING.md](CONTRIBUTING.md)，自动发版的配置和操作步骤见
+[docs/RELEASING.md](docs/RELEASING.md)，版本变化记录在 [CHANGELOG.md](CHANGELOG.md)。
 
 ## License
 
-MIT
+[MIT](LICENSE)

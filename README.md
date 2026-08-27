@@ -1,234 +1,228 @@
 # TelePress
 
-[中文文档](https://github.com/zoidberg-xgd/telepress/blob/master/README_CN.md)
+[![CI](https://github.com/redtidev1918/telepress/actions/workflows/ci.yml/badge.svg)](https://github.com/redtidev1918/telepress/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/telepress.svg)](https://pypi.org/project/telepress/)
+[![Python](https://img.shields.io/pypi/pyversions/telepress.svg)](https://pypi.org/project/telepress/)
 
-Publish Markdown, images and zip archives to [Telegraph](https://telegra.ph). Handles large files by auto-splitting into multiple linked pages.
+[中文文档](README_CN.md)
 
-## Install
+TelePress publishes Markdown, plain text, images, and ZIP galleries to
+[Telegraph](https://telegra.ph). It supports automatic pagination, external
+image hosts, image compression, concurrent uploads, and an optional REST API.
+
+## Requirements
+
+- Python 3.10 or newer
+- A Telegraph token, or permission to create one on first use
+- An image-host configuration only when publishing images or galleries
+
+## Installation
 
 ```bash
 pip install telepress
 
-# with REST API
-pip install telepress[api]
+# Optional REST API
+pip install "telepress[api]"
 
-# from source
-git clone https://github.com/zoidberg-xgd/telepress
-cd telepress && pip install -e .
+# Optional S3-compatible hosts such as AWS S3 and Cloudflare R2
+pip install "telepress[s3]"
+
+# Optional YAML configuration files
+pip install "telepress[yaml]"
 ```
 
-## Usage
+Install from source for development:
 
-CLI Configuration Wizard:
+```bash
+git clone https://github.com/redtidev1918/telepress.git
+cd telepress
+python -m pip install --editable ".[dev]"
+```
+
+## Quick start
+
+Publish a document:
+
+```bash
+telepress article.md --title "My post"
+
+# The explicit subcommand is equivalent
+telepress publish article.md --title "My post"
+```
+
+Publish an image or ZIP gallery after configuring an image host:
+
 ```bash
 telepress configure
-```
-
-Check configuration:
-```bash
 telepress check
+telepress photo.jpg --title "Photo"
+telepress gallery.zip --title "Gallery"
 ```
 
-Publishing:
+Useful publishing options:
+
 ```bash
-telepress article.md --title "My Post"
-telepress photos.zip --title "Album"
+# Override the configured image limit in MiB
+telepress gallery.zip --image-size-limit 10
 
-# Set image size limit to 10MB
-telepress article.md --image-size-limit 10
+# Keep original images instead of compressing oversized files
+telepress gallery.zip --no-compress
 
-# Disable compression
-telepress article.md --no-compress
+# Use a Telegraph-compatible API endpoint
+telepress article.md --api-url http://localhost:9009
 ```
 
-REST API:
-```bash
-telepress-server --port 8000
+Text-only publishing does not load or require an image-host configuration.
+The Telegraph access token is created automatically when needed and stored in
+`~/.telegraph_token` unless one is supplied with `--token`.
 
-curl -X POST localhost:8000/publish/text \
+## REST API
+
+Install the optional API dependencies first: `pip install "telepress[api]"`.
+
+```bash
+telepress-server --host 127.0.0.1 --port 8000
+```
+
+Interactive OpenAPI documentation is available at
+`http://127.0.0.1:8000/docs`.
+
+```bash
+curl -X POST http://127.0.0.1:8000/publish/text \
   -H "Content-Type: application/json" \
-  -d '{"content": "# Title\n\nBody", "title": "Test"}'
+  -d '{"content":"# Title\n\nBody","title":"Example"}'
+
+curl -X POST http://127.0.0.1:8000/publish/file \
+  -F "file=@article.md" \
+  -F "title=Example"
 ```
 
-## How it works
+Blocking file, compression, and network work is dispatched away from the API
+event loop, so concurrent requests do not serialize on those operations.
 
-Text files are converted to Telegraph format (Markdown supported). Plain text files preserve line breaks as paragraphs. Large content is split at ~10KB boundaries into multiple pages with prev/next navigation.
+## Image hosts
 
-Token is auto-created on first run and saved to `~/.telegraph_token`.
+Supported hosts:
 
-## Features
+- ImgBB
+- Imgur
+- sm.ms
+- S3-compatible storage, including AWS S3, Cloudflare R2, OSS, and MinIO
+- Rclone remotes
+- Custom HTTP upload APIs
 
-- **External image hosting**: Upload to imgbb, imgur, sm.ms, S3/R2/OSS, or Rclone (configurable)
-- **Rclone Integration**: High-performance batch uploads using Rclone (requires [manual installation](https://rclone.org/downloads/))
-- **Smart Text Optimization**: Automatically formats novels/articles with chapter detection and layout cleanup
-- **Auto compression**: Images over 5MB automatically compressed (configurable)
-- **Batch upload**: Multi-threaded concurrent uploads with progress callback
-- **Deduplication**: Same content won't be uploaded twice
-- **Auto-pagination**: Large content split into multiple linked pages
-
-## Limits
-
-- Telegraph's direct image upload is unavailable, using external image hosts instead
-- 5MB per image (auto-compressed if larger, configurable via `--image-size-limit` or `--no-compress`)
-
-Supported: `.txt` `.md` `.markdown` `.rst` `.jpg` `.png` `.gif` `.webp` `.zip`
-
-## Image Upload
-
-Supported hosts: **imgbb**, **imgur**, **sm.ms**, **S3/R2/OSS**, **Rclone**, **Custom API**
-
-### Configuration
-
-Use the wizard:
-```bash
-telepress configure
-```
-
-Install Rclone (if needed):
-```bash
-telepress install-rclone
-```
-
-Or create `~/.telepress.json` manually:
+Run `telepress configure` for the interactive setup, or create
+`~/.telepress.json`:
 
 ```json
 {
-    "image_host": {
-        "type": "rclone",
-        "remote_path": "myremote:bucket/path",
-        "public_url": "https://pub.r2.dev/path",
-        "rclone_flags": ["--transfers=32", "--checkers=32"],
-        "max_size_mb": 20
-    }
+  "image_host": {
+    "type": "rclone",
+    "remote_path": "myremote:bucket/path",
+    "public_url": "https://cdn.example.com/path",
+    "rclone_flags": ["--transfers=32", "--checkers=32"],
+    "max_size_mb": 20,
+    "max_workers": 8
+  }
 }
 ```
 
-### Other Examples
-
-**ImgBB / Imgur:**
-```json
-{
-    "image_host": {
-        "type": "imgur",
-        "client_id": "your_client_id",
-        "max_size_mb": 10,
-        "max_workers": 8
-    }
-}
-```
-
-Or use S3/R2:
+S3-compatible configuration:
 
 ```json
 {
-    "image_host": {
-        "type": "s3",
-        "access_key_id": "your_access_key",
-        "secret_access_key": "your_secret_key",
-        "bucket": "your_bucket",
-        "public_url": "https://your-bucket.s3.amazonaws.com",
-        "endpoint_url": "https://s3.us-west-1.amazonaws.com",
-        "region_name": "us-west-1"
-    }
+  "image_host": {
+    "type": "s3",
+    "access_key_id": "your-access-key",
+    "secret_access_key": "your-secret-key",
+    "bucket": "your-bucket",
+    "public_url": "https://cdn.example.com",
+    "endpoint_url": "https://s3.example.com",
+    "region_name": "auto"
+  }
 }
 ```
 
-Or use environment variables:
+Environment variables override file configuration:
+
 ```bash
-export TELEPRESS_IMAGE_HOST_TYPE=rclone
-export TELEPRESS_IMAGE_HOST_REMOTE_PATH=myremote:bucket/path
-export TELEPRESS_IMAGE_HOST_PUBLIC_URL=https://pub.r2.dev/path
+export TELEPRESS_IMAGE_HOST_TYPE=imgbb
+export TELEPRESS_IMAGE_HOST_API_KEY=your-key
 ```
 
-### Usage
+Configuration is searched in the following locations:
+
+1. The path passed to `load_config()`
+2. `TELEPRESS_CONFIG`
+3. `~/.telepress.json`, `~/.telepress.yaml`, `~/.telepress.yml`
+4. `~/.config/telepress.json`
+
+## Python API
+
+```python
+from telepress import TelegraphPublisher, publish, publish_text
+
+url = publish("article.md", title="My article")
+text_url = publish_text("# Hello\n\nWorld", title="Hello")
+
+publisher = TelegraphPublisher(image_size_limit=10)
+gallery_url = publisher.publish("gallery.zip", title="Gallery")
+```
+
+Upload images directly:
 
 ```python
 from telepress import ImageUploader
 
-# Load from config file or env vars
-uploader = ImageUploader()  # Auto-loads from ~/.telepress.json
+uploader = ImageUploader("imgbb", api_key="your-key")
+url = uploader.upload("photo.jpg")
 
-# Or specify explicitly
-uploader = ImageUploader('imgbb', api_key='your_key')
-uploader = ImageUploader('r2', access_key_id='...', secret_access_key='...', bucket='...', public_url='...')
-
-# Custom API endpoint
-uploader = ImageUploader('custom',
-    upload_url='https://your-api.com/upload',
-    headers={'Authorization': 'Bearer xxx'},
-    response_url_path='data.url'  # JSON path to URL in response
-)
-
-# Upload
-url = uploader.upload('photo.jpg')
-
-# Batch upload
-results = uploader.upload_batch(image_paths)
-print(f"Success: {results.success_rate:.0%}")
+batch = uploader.upload_batch(["1.jpg", "2.jpg"])
+print(batch.success_rate, batch.get_url_map())
 ```
 
-## Image Compression
+## Behavior and limits
 
-```python
-from telepress import compress_image_to_size, MAX_IMAGE_SIZE
+- Markdown and plain text are converted to Telegraph DOM nodes.
+- Plain text chapter headings such as `Chapter 1` and `第一章` are detected.
+- Large text is split near 10,000-character boundaries and linked with
+  previous/next navigation.
+- Galleries are split at 100 images per page.
+- Images larger than 5 MiB are compressed by default; GIF compression is
+  intentionally skipped.
+- A 2 GiB input safety limit is applied before processing.
+- Duplicate text publications are cached in `~/.telepress_cache.json` by
+  default.
 
-# Compress to under 5MB
-compressed_path, was_compressed = compress_image_to_size(
-    "large_photo.png",
-    max_size=MAX_IMAGE_SIZE,
-    prefer_webp=False  # True for WebP output
-)
-```
-
-## Project structure
-
-```
-telepress/
-├── core.py       # TelegraphPublisher
-├── image_host.py # External image hosting (imgbb, imgur, smms)
-├── uploader.py   # ImageUploader with batch support
-├── utils.py      # Compression utilities
-├── server.py     # FastAPI service
-└── cli.py        # Command line
-```
+Supported input extensions include `.txt`, `.md`, `.markdown`, `.rst`,
+`.text`, `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.bmp`, and `.zip`.
 
 ## Error handling
 
 ```python
-from telepress import publish, ValidationError, TelePressError
+from telepress import TelePressError, ValidationError, publish
 
 try:
-    url = publish("file.md")
-except ValidationError as e:
-    # bad input: wrong format, too large, etc
-    print(e)
-except TelePressError as e:
-    # other errors: upload failed, auth failed, etc
-    print(e)
+    url = publish("article.md")
+except ValidationError as exc:
+    print(f"Invalid input: {exc}")
+except TelePressError as exc:
+    print(f"Publishing failed: {exc}")
 ```
 
-## Integration
-
-```python
-# Flask
-@app.route('/publish', methods=['POST'])
-def api_publish():
-    url = publish_text(request.json['content'], title=request.json['title'])
-    return {'url': url}
-
-# async
-async def async_publish(content, title):
-    return await asyncio.to_thread(publish_text, content, title)
-```
-
-## Dev
+## Development and releases
 
 ```bash
-git clone https://github.com/zoidberg-xgd/telepress
-cd telepress && pip install -e .[dev]
-pytest tests/ -v
+python -m pip install --editable ".[dev]"
+python -m pytest --cov
+python -m build
+python -m twine check dist/*
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution conventions and
+[docs/RELEASING.md](docs/RELEASING.md) for the automated release workflow.
+Notable changes are recorded in [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-MIT
+[MIT](LICENSE)
