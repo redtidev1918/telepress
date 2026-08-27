@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 from typing import Optional
 import os
 import shutil
@@ -29,6 +30,22 @@ def get_publisher(token: Optional[str] = None):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+def _write_text_temp(content: str) -> str:
+    """Write request text without blocking the async event loop."""
+    with tempfile.NamedTemporaryFile(
+        mode='w', suffix='.md', delete=False, encoding='utf-8'
+    ) as tmp:
+        tmp.write(content)
+        return tmp.name
+
+
+def _copy_upload_temp(file_obj, suffix: str) -> str:
+    """Copy an uploaded file into a stable temporary path."""
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        shutil.copyfileobj(file_obj, tmp)
+        return tmp.name
+
 @app.get("/")
 def health_check():
     return {"status": "ok", "service": "telepress"}
@@ -39,22 +56,23 @@ async def publish_text(request: TextPublishRequest):
     Publish raw Markdown/Text content directly.
     """
     try:
-        # We need to save to a temp file because our core logic expects files
-        # Alternatively, we could refactor core to accept string, but file is safer for large content
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False, encoding='utf-8') as tmp:
-            tmp.write(request.content)
-            tmp_path = tmp.name
+        tmp_path = await run_in_threadpool(_write_text_temp, request.content)
         
-        publisher = get_publisher(request.token)
-        url = publisher.publish(tmp_path, title=request.title)
-        
-        os.unlink(tmp_path)
+        # Publishing performs synchronous HTTP requests and may wait for rate
+        # limits, so keep it off the async event loop.
+        publisher = await run_in_threadpool(get_publisher, request.token)
+        url = await run_in_threadpool(
+            publisher.publish, tmp_path, title=request.title
+        )
         return PublishResponse(url=url)
         
     except TelePressError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if 'tmp_path' in locals() and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
 
 @app.post("/publish/file", response_model=PublishResponse)
 async def publish_file(
@@ -67,27 +85,27 @@ async def publish_file(
     """
     try:
         suffix = os.path.splitext(file.filename)[1]
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            shutil.copyfileobj(file.file, tmp)
-            tmp_path = tmp.name
+        tmp_path = await run_in_threadpool(
+            _copy_upload_temp, file.file, suffix
+        )
             
-        publisher = get_publisher(token)
+        publisher = await run_in_threadpool(get_publisher, token)
         
         # If no title provided, use filename from upload
         pub_title = title if title else file.filename
         
-        url = publisher.publish(tmp_path, title=pub_title)
-        
-        os.unlink(tmp_path)
+        url = await run_in_threadpool(
+            publisher.publish, tmp_path, title=pub_title
+        )
         return PublishResponse(url=url)
         
     except TelePressError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        # Clean up if exists
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
         if 'tmp_path' in locals() and os.path.exists(tmp_path):
             os.unlink(tmp_path)
-        raise HTTPException(status_code=500, detail=str(e))
 
 def start_server(host="0.0.0.0", port=8000):
     """Start the TelePress API server."""
