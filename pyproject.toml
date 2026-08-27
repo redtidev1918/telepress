@@ -52,7 +52,7 @@ yaml = [
 ]
 dev = [
   "boto3>=1.34",
-  "build>=1.2",
+  "build>=1.5.0",
   "fastapi>=0.110",
   "httpx>=0.27",
   "numpy>=1.26",
