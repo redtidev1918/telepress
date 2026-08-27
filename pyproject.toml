@@ -42,7 +42,7 @@ dependencies = [
 api = [
   "fastapi>=0.110",
   "python-multipart>=0.0.32",
-  "uvicorn>=0.29",
+  "uvicorn>=0.52.4",
 ]
 s3 = [
   "boto3>=1.34",
@@ -61,7 +61,7 @@ dev = [
   "python-multipart>=0.0.32",
   "PyYAML>=6",
   "twine>=5",
-  "uvicorn>=0.29",
+  "uvicorn>=0.52.4",
 ]
 
 [project.scripts]
