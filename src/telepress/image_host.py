@@ -22,7 +22,7 @@ class ImageHost(ABC):
         """Upload image and return URL."""
         pass
     
-    def upload_batch(self, image_paths: list[str]) -> Dict[str, Union[str, Exception]]:
+    def upload_batch(self, image_paths: List[str]) -> Dict[str, Union[str, Exception]]:
         """
         Batch upload images.
         
@@ -320,7 +320,7 @@ class RcloneHost(ImageHost):
             raise res[image_path]
         return res[image_path]
 
-    def upload_batch(self, image_paths: list[str]) -> Dict[str, Union[str, Exception]]:
+    def upload_batch(self, image_paths: List[str]) -> Dict[str, Union[str, Exception]]:
         if not image_paths:
             return {}
             
