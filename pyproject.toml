@@ -33,7 +33,7 @@ classifiers = [
 ]
 dependencies = [
   "Markdown>=3.5",
-  "Pillow>=10",
+  "Pillow>=12.3.0",
   "requests>=2.31",
   "telegraph>=2.2",
 ]
