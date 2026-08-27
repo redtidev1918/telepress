@@ -10,6 +10,7 @@ from telepress.utils import (
     ALLOWED_IMAGE_EXTENSIONS, ALLOWED_TEXT_EXTENSIONS, ALLOWED_ARCHIVE_EXTENSIONS
 )
 from telepress.exceptions import SecurityError, ValidationError, ConversionError
+from telepress import utils as utils_module
 from PIL import Image
 
 
@@ -251,6 +252,23 @@ class TestSafeExtractZip(unittest.TestCase):
             os.remove(zip_path)
             shutil.rmtree(extract_dir)
 
+    def test_zip_slip_with_target_prefix_sibling(self):
+        """A sibling path sharing the target prefix must still be blocked."""
+        base_dir = tempfile.mkdtemp()
+        extract_dir = os.path.join(base_dir, 'extract')
+        zip_path = os.path.join(base_dir, 'malicious.zip')
+        os.mkdir(extract_dir)
+
+        try:
+            with zipfile.ZipFile(zip_path, 'w') as zf:
+                zf.writestr('../extract-evil/file.txt', 'malicious')
+
+            with self.assertRaises(SecurityError):
+                safe_extract_zip(zip_path, extract_dir)
+            self.assertFalse(os.path.exists(os.path.join(base_dir, 'extract-evil')))
+        finally:
+            shutil.rmtree(base_dir)
+
     def test_empty_zip(self):
         """Test extracting empty zip file."""
         with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp_zip:
@@ -298,6 +316,26 @@ class TestConstants(unittest.TestCase):
 
 
 class TestCompressImageToSize(unittest.TestCase):
+    def test_quality_search_uses_logarithmic_encodes(self):
+        """Quality-only compression finds the best fit in few encodes."""
+        class FakeImage:
+            def __init__(self):
+                self.qualities = []
+
+            def save(self, buffer, **kwargs):
+                quality = kwargs['quality']
+                self.qualities.append(quality)
+                buffer.write(b'x' * quality)
+
+        image = FakeImage()
+        result = utils_module._try_quality_compression(
+            image, max_size=72, min_quality=30, out_format='JPEG'
+        )
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result.tell(), 72)
+        self.assertLessEqual(len(image.qualities), 7)
+
     def test_small_image_no_compression(self):
         """Test that images under the limit are not compressed."""
         with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as f:

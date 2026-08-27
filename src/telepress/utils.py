@@ -38,13 +38,22 @@ def safe_extract_zip(zip_path: str, extract_to: str):
     Safely extracts a zip file, preventing Zip Slip vulnerabilities.
     """
     with zipfile.ZipFile(zip_path, 'r') as zf:
+        abs_target_path = os.path.abspath(extract_to)
         for member in zf.namelist():
             # Resolve the path to ensure it doesn't escape the target directory
             member_path = os.path.join(extract_to, member)
             abs_member_path = os.path.abspath(member_path)
-            abs_target_path = os.path.abspath(extract_to)
-            
-            if not abs_member_path.startswith(abs_target_path):
+
+            # commonpath compares complete path components; a string prefix
+            # check would incorrectly allow a sibling such as /tmp/outside.
+            try:
+                is_inside_target = os.path.commonpath(
+                    [abs_target_path, abs_member_path]
+                ) == abs_target_path
+            except ValueError:
+                is_inside_target = False
+
+            if not is_inside_target:
                 raise SecurityError(f"Zip Slip attempt detected: {member}")
             
             # Extract only if safe
@@ -198,14 +207,26 @@ def _try_quality_compression(
     min_quality: int,
     out_format: str
 ) -> Optional[io.BytesIO]:
-    """Try to compress by reducing quality only."""
-    for quality in range(95, min_quality - 1, -5):
+    """Find the highest fitting quality with logarithmic encode attempts."""
+    low = min_quality
+    high = 95
+    best = None
+
+    while low <= high:
+        quality = (low + high) // 2
         buffer = io.BytesIO()
         img.save(buffer, format=out_format, quality=quality, optimize=True)
+
         if buffer.tell() <= max_size:
-            return buffer
-        buffer.close()  # Free memory
-    return None
+            if best is not None:
+                best.close()
+            best = buffer
+            low = quality + 1
+        else:
+            buffer.close()
+            high = quality - 1
+
+    return best
 
 
 def _try_scale_compression(
