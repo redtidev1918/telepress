@@ -34,8 +34,8 @@ from .utils import (
     ALLOWED_ARCHIVE_EXTENSIONS,
     compress_image_to_size
 )
+from .version import __version__
 
-__version__ = "0.3.5"
 __all__ = [
     # Main classes
     'TelegraphPublisher',
@@ -77,6 +77,7 @@ __all__ = [
     'ALLOWED_TEXT_EXTENSIONS',
     'ALLOWED_IMAGE_EXTENSIONS',
     'ALLOWED_ARCHIVE_EXTENSIONS',
+    '__version__',
 ]
 
 # Singleton publisher for convenience functions
