@@ -446,9 +446,21 @@ class TelegraphPublisher(IPublisher):
         finally:
             os.unlink(tmp_path)
 
-    def publish_zip_gallery(self, zip_path: str, title: str) -> str:
+    def publish_zip_gallery(
+        self,
+        zip_path: str,
+        title: str,
+        footer_nodes: Optional[List[Dict]] = None
+    ) -> str:
         """
         Publish a zip file containing images as a gallery.
+        
+        Args:
+            zip_path: Path to a zip file containing the gallery images.
+            title: Page title (shared by all pages when paginated).
+            footer_nodes: Optional extra Telegraph nodes (tags, source link,
+                warnings) appended to the first page only, above the
+                Prev/Next navigation links.
         
         Limits:
         - Maximum 5000 images (50 pages × 100 images)
@@ -522,6 +534,11 @@ class TelegraphPublisher(IPublisher):
                 for img_path in chunk_images:
                     if img_path in url_map:
                         content.append({'tag': 'img', 'attrs': {'src': url_map[img_path]}})
+
+                # Footer metadata (tags / source link / warnings) belongs on the
+                # first page only; later pages stay image-only plus navigation.
+                if i == 0 and footer_nodes:
+                    content = content + list(footer_nodes)
                 
                 if not content and len(chunk_images) > 0:
                      print(f"Warning: Part {part_num} resulted in empty content.")
@@ -548,10 +565,22 @@ class TelegraphPublisher(IPublisher):
 
             return pages_info[0]['url'] if pages_info else ""
 
-    def publish_optimized_gallery(self, image_urls: List[str], title: str) -> str:
+    def publish_optimized_gallery(
+        self,
+        image_urls: List[str],
+        title: str,
+        footer_nodes: Optional[List[Dict]] = None
+    ) -> str:
         """
         Publish a gallery using existing image URLs (no upload needed).
         Handles pagination and navigation linking automatically.
+        
+        Args:
+            image_urls: Public image URLs to render in the gallery.
+            title: Page title (shared by all pages when paginated).
+            footer_nodes: Optional extra Telegraph nodes (tags, source link,
+                warnings) appended to the first page only, above the
+                Prev/Next navigation links.
         """
         if not image_urls:
             raise ValidationError("No image URLs provided")
@@ -578,6 +607,11 @@ class TelegraphPublisher(IPublisher):
             content = []
             for url in chunk_urls:
                 content.append({'tag': 'img', 'attrs': {'src': url}})
+
+            # Footer metadata (tags / source link / warnings) belongs on the
+            # first page only; later pages stay image-only plus navigation.
+            if i == 0 and footer_nodes:
+                content = content + list(footer_nodes)
             
             try:
                 # Create initial page

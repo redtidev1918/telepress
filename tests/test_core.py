@@ -374,6 +374,49 @@ class TestPublishZipGallery(unittest.TestCase):
         finally:
             os.unlink(zip_path)
 
+    def test_publish_zip_gallery_footer_first_page_only(self):
+        """Test that footer_nodes are added only to the first page."""
+        with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp_zip:
+            with zipfile.ZipFile(tmp_zip, 'w') as zf:
+                for i in range(150):
+                    zf.writestr(f'{i}.jpg', b'img')
+            zip_path = tmp_zip.name
+        
+        try:
+            def batch_side_effect(images, **kwargs):
+                res = MagicMock()
+                res.get_url_map.return_value = {img: "http://url" for img in images}
+                res.get_failed_paths.return_value = []
+                res.results = []
+                return res
+
+            self.publisher.uploader.upload_batch.side_effect = batch_side_effect
+            self.mock_client.create_page.side_effect = [
+                {'url': 'http://telegra.ph/page1', 'path': 'page1'},
+                {'url': 'http://telegra.ph/page2', 'path': 'page2'},
+            ]
+            self.mock_client.edit_page.return_value = {}
+
+            footer = [
+                {'tag': 'p', 'children': ['# tag1 #tag2']},
+                {'tag': 'p', 'children': ['Source: http://pixiv.example/123']},
+            ]
+            self.publisher.publish_zip_gallery(
+                zip_path, title="Test", footer_nodes=footer
+            )
+
+            first_content = self.mock_client.create_page.call_args_list[0].kwargs['content']
+            second_content = self.mock_client.create_page.call_args_list[1].kwargs['content']
+            # Footer paragraphs sit after the 100 images of the first page.
+            self.assertEqual(first_content[-2]['tag'], 'p')
+            self.assertIn('# tag1', first_content[-2]['children'][0])
+            self.assertEqual(first_content[-1]['tag'], 'p')
+            self.assertIn('Source:', first_content[-1]['children'][0])
+            # Second page is image-only.
+            self.assertTrue(all(n['tag'] == 'img' for n in second_content))
+        finally:
+            os.unlink(zip_path)
+
 
 class TestLinkPages(unittest.TestCase):
     def setUp(self):
@@ -1069,6 +1112,43 @@ class TestPublishOptimizedGallery(unittest.TestCase):
         
         # edit_page should be called to add navigation links
         self.assertTrue(self.mock_client.edit_page.called)
+
+    def test_publish_optimized_gallery_footer_first_page_only(self):
+        """Test that footer_nodes are appended only to the first page."""
+        image_urls = [f"http://example.com/img{i}.jpg" for i in range(150)]
+
+        self.mock_client.create_page.side_effect = [
+            {'url': 'http://telegra.ph/page1', 'path': 'page1'},
+            {'url': 'http://telegra.ph/page2', 'path': 'page2'},
+        ]
+        self.mock_client.edit_page.return_value = {}
+
+        footer = [{'tag': 'p', 'children': ['# tag1']}]
+        self.publisher.publish_optimized_gallery(
+            image_urls, title="Test", footer_nodes=footer
+        )
+
+        first_content = self.mock_client.create_page.call_args_list[0].kwargs['content']
+        second_content = self.mock_client.create_page.call_args_list[1].kwargs['content']
+        self.assertEqual(first_content[-1], footer[0])
+        self.assertTrue(all(n['tag'] == 'img' for n in second_content))
+
+    def test_publish_optimized_gallery_footer_empty_ignored(self):
+        """Test that empty footer list leaves the gallery unchanged."""
+        image_urls = ["http://example.com/img0.jpg"]
+
+        self.mock_client.create_page.return_value = {
+            'url': 'http://telegra.ph/test',
+            'path': 'test'
+        }
+
+        self.publisher.publish_optimized_gallery(
+            image_urls, title="Test", footer_nodes=[]
+        )
+
+        content = self.mock_client.create_page.call_args.kwargs['content']
+        self.assertEqual(len(content), 1)
+        self.assertEqual(content[0]['tag'], 'img')
 
 
 if __name__ == '__main__':
