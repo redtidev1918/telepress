@@ -4,6 +4,19 @@ All notable changes to TelePress are documented in this file. The project uses
 [Semantic Versioning](https://semver.org/) and the changelog is maintained by
 Release Please from Conventional Commits.
 
+## [0.5.0](https://github.com/redtidev1918/telepress/compare/v0.4.0...v0.5.0) (2026-08-30)
+
+
+### Features
+
+* **core:** support optional footer nodes in gallery publishing ([4efcf12](https://github.com/redtidev1918/telepress/commit/4efcf12df60a9fdb49ebb6e104fe28d3eddb6aca))
+* **server:** add /publish/gallery endpoint for multi-image galleries ([545e0fb](https://github.com/redtidev1918/telepress/commit/545e0fbe08413e84a5a33f5629078e96f7722675))
+
+
+### Documentation
+
+* document /publish/gallery REST endpoint ([cd03d83](https://github.com/redtidev1918/telepress/commit/cd03d83d0883a0dd671cd9352d70b3ba320f43d2))
+
 ## [0.4.0](https://github.com/redtidev1918/telepress/compare/v0.3.5...v0.4.0) (2026-08-27)
 
 
