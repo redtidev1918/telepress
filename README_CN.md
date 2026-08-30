@@ -92,7 +92,23 @@ curl -X POST http://127.0.0.1:8000/publish/text \
 curl -X POST http://127.0.0.1:8000/publish/file \
   -F "file=@article.md" \
   -F "title=示例"
+
+curl -X POST http://127.0.0.1:8000/publish/gallery \
+  -F "files=@p0.jpg" \
+  -F "files=@p1.jpg" \
+  -F "title=相册标题" \
+  -F "tags=pixiv, illustration" \
+  -F "link=https://www.pixiv.net/artworks/123456" \
+  -F "spoiler=true"
 ```
+
+`/publish/gallery` 接收可重复的 `files` 文件字段，以及可选的 `title`、
+`tags`（逗号分隔）、`link`（来源链接）和 `spoiler`（R-18 内容传真值即可）
+表单字段。文件按上传顺序打包成 zip 后发布为 Telegra.ph 相册，自动分页并
+加上「上一页/下一页」导航；`tags`、`link` 和 R-18 提示会渲染在首页页脚。
+返回 `{"ok": true, "url": "...", "files": N}`，兼容通用 multipart 交付
+客户端，例如 PixivFlow 的 `httpMultipart` 目标指向
+`http://<telepress-host>:8000/publish/gallery`。
 
 文件读写、图片压缩和同步网络请求会在线程池执行，不会阻塞 API 的异步事件循环。
 

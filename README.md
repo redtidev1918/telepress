@@ -95,7 +95,24 @@ curl -X POST http://127.0.0.1:8000/publish/text \
 curl -X POST http://127.0.0.1:8000/publish/file \
   -F "file=@article.md" \
   -F "title=Example"
+
+curl -X POST http://127.0.0.1:8000/publish/gallery \
+  -F "files=@p0.jpg" \
+  -F "files=@p1.jpg" \
+  -F "title=Gallery title" \
+  -F "tags=pixiv, illustration" \
+  -F "link=https://www.pixiv.net/artworks/123456" \
+  -F "spoiler=true"
 ```
+
+`/publish/gallery` accepts repeated `files` parts plus optional `title`,
+`tags` (comma-separated), `link` (source URL) and `spoiler` (truthy for R-18
+content) form fields. Files are packed into a zip in upload order and
+published with automatic pagination and Prev/Next navigation; `tags`, `link`
+and the R-18 warning are rendered as a footer on the first page. It returns
+`{"ok": true, "url": "...", "files": N}` and is compatible with generic
+multipart delivery clients, e.g. PixivFlow `httpMultipart` targets pointing
+at `http://<telepress-host>:8000/publish/gallery`.
 
 Blocking file, compression, and network work is dispatched away from the API
 event loop, so concurrent requests do not serialize on those operations.
