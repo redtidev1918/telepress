@@ -247,5 +247,163 @@ class TestStartServer(unittest.TestCase):
             mock_run.assert_called_once_with(app, host="127.0.0.1", port=9000)
 
 
+class TestGalleryEndpoint(unittest.TestCase):
+    def setUp(self):
+        """Patch TelegraphPublisher so gallery requests never hit the network."""
+        self.patcher = patch('telepress.server.TelegraphPublisher')
+        self.mock_publisher_class = self.patcher.start()
+        self.addCleanup(self.patcher.stop)
+
+        self.mock_publisher_instance = MagicMock()
+        self.mock_publisher_class.return_value = self.mock_publisher_instance
+        self.mock_publisher_instance.publish_zip_gallery.return_value = (
+            'http://telegra.ph/gallery'
+        )
+
+        from telepress.server import app
+        self.client = TestClient(app)
+
+    def _gallery_files(self):
+        return [
+            ("files", ("p0.jpg", b"fake image 0", "image/jpeg")),
+            ("files", ("p1.jpg", b"fake image 1", "image/jpeg")),
+        ]
+
+    def test_publish_gallery_success(self):
+        """Test publishing multiple files as a gallery with metadata."""
+        response = self.client.post(
+            "/publish/gallery",
+            files=self._gallery_files(),
+            data={
+                "title": "My Gallery",
+                "tags": "pixiv, illustration",
+                "link": "https://www.pixiv.net/artworks/123456",
+                "spoiler": "true",
+                "token": "custom_token",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['ok'], True)
+        self.assertEqual(data['status'], 'success')
+        self.assertEqual(data['url'], 'http://telegra.ph/gallery')
+        self.assertEqual(data['files'], 2)
+
+        call_args = self.mock_publisher_instance.publish_zip_gallery.call_args
+        self.assertEqual(call_args[1]['title'], 'My Gallery')
+        footer = call_args[1]['footer_nodes']
+        self.assertEqual(len(footer), 3)
+        # spoiler note
+        self.assertIn('R-18', footer[0]['children'][0])
+        # tags paragraph
+        self.assertIn('# pixiv', footer[1]['children'][0])
+        # source link paragraph
+        self.assertIn('Source:', footer[2]['children'][0])
+        self.assertEqual(footer[2]['children'][1]['attrs']['href'],
+                         'https://www.pixiv.net/artworks/123456')
+
+    def test_publish_gallery_default_title_from_first_file(self):
+        """Test that title falls back to the first file name."""
+        response = self.client.post(
+            "/publish/gallery", files=self._gallery_files()
+        )
+
+        self.assertEqual(response.status_code, 200)
+        call_args = self.mock_publisher_instance.publish_zip_gallery.call_args
+        self.assertEqual(call_args[1]['title'], 'p0')
+
+    def test_publish_gallery_without_metadata_no_footer(self):
+        """Test that no metadata produces an empty footer."""
+        response = self.client.post(
+            "/publish/gallery", files=self._gallery_files()
+        )
+
+        self.assertEqual(response.status_code, 200)
+        call_args = self.mock_publisher_instance.publish_zip_gallery.call_args
+        self.assertEqual(call_args[1]['footer_nodes'], [])
+
+    def test_publish_gallery_duplicate_filenames(self):
+        """Test that duplicate file names are disambiguated before zipping."""
+        response = self.client.post(
+            "/publish/gallery",
+            files=[
+                ("files", ("p0.jpg", b"a", "image/jpeg")),
+                ("files", ("p0.jpg", b"b", "image/jpeg")),
+            ],
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['files'], 2)
+
+    def test_publish_gallery_requires_files(self):
+        """Test that a request without files is rejected (422)."""
+        response = self.client.post("/publish/gallery")
+        self.assertEqual(response.status_code, 422)
+
+    @patch('telepress.server.TelegraphPublisher')
+    def test_publish_gallery_telepress_error(self, MockPublisher):
+        """Test that TelePressError returns 400."""
+        from telepress.exceptions import ValidationError
+
+        mock_instance = MagicMock()
+        mock_instance.publish_zip_gallery.side_effect = ValidationError(
+            "No images found"
+        )
+        MockPublisher.return_value = mock_instance
+
+        from telepress.server import app
+        client = TestClient(app)
+
+        response = client.post(
+            "/publish/gallery",
+            files=[("files", ("p0.jpg", b"fake", "image/jpeg"))],
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("No images found", response.json()['detail'])
+
+    @patch('telepress.server.TelegraphPublisher')
+    def test_publish_gallery_unexpected_error(self, MockPublisher):
+        """Test that unexpected errors return 500."""
+        mock_instance = MagicMock()
+        mock_instance.publish_zip_gallery.side_effect = RuntimeError("boom")
+        MockPublisher.return_value = mock_instance
+
+        from telepress.server import app
+        client = TestClient(app)
+
+        response = client.post(
+            "/publish/gallery",
+            files=[("files", ("p0.jpg", b"fake", "image/jpeg"))],
+        )
+
+        self.assertEqual(response.status_code, 500)
+
+
+class TestGalleryFooterBuilder(unittest.TestCase):
+    def test_footer_with_all_fields(self):
+        """Test footer builder renders warning, tags and source link."""
+        from telepress.server import _build_gallery_footer
+
+        nodes = _build_gallery_footer(
+            tags=" pixiv , illustration ",
+            link="https://www.pixiv.net/artworks/1",
+            spoiler="true",
+        )
+        self.assertEqual(len(nodes), 3)
+        self.assertIn('R-18', nodes[0]['children'][0])
+        self.assertEqual(nodes[1]['children'][0], '# pixiv #illustration')
+        self.assertEqual(nodes[2]['children'][1]['attrs']['href'],
+                         'https://www.pixiv.net/artworks/1')
+
+    def test_footer_without_fields(self):
+        """Test footer builder returns empty list when nothing is set."""
+        from telepress.server import _build_gallery_footer
+
+        self.assertEqual(_build_gallery_footer(None, None, None), [])
+        self.assertEqual(_build_gallery_footer("", "", "false"), [])
+
+
 if __name__ == '__main__':
     unittest.main()

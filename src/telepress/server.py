@@ -7,12 +7,13 @@ except ImportError as exc:  # pragma: no cover - exercised only without [api]
         'The TelePress API server needs optional dependencies. '
         'Install them with: pip install "telepress[api]"'
     ) from exc
-from typing import Optional
+from typing import Optional, List, Dict
 import os
 import shutil
 import tempfile
+import zipfile
 from .core import TelegraphPublisher
-from .exceptions import TelePressError
+from .exceptions import TelePressError, ValidationError
 
 app = FastAPI(
     title="TelePress API",
@@ -29,6 +30,12 @@ class TextPublishRequest(BaseModel):
 class PublishResponse(BaseModel):
     url: str
     status: str = "success"
+
+class GalleryPublishResponse(BaseModel):
+    url: str
+    status: str = "success"
+    ok: bool = True
+    files: int = 0
 
 def get_publisher(token: Optional[str] = None):
     try:
@@ -51,6 +58,93 @@ def _copy_upload_temp(file_obj, suffix: str) -> str:
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         shutil.copyfileobj(file_obj, tmp)
         return tmp.name
+
+
+def _build_gallery_footer(
+    tags: Optional[str],
+    link: Optional[str],
+    spoiler: Optional[str]
+) -> List[Dict]:
+    """
+    Build the first-page footer nodes for a gallery from optional metadata.
+    
+    Renders an R-18 warning when spoiler is truthy, a #tag paragraph, and a
+    source link paragraph. Returns [] when nothing is provided.
+    """
+    nodes: List[Dict] = []
+    if spoiler and str(spoiler).strip().lower() in ('1', 'true', 'yes', 'on'):
+        nodes.append({
+            'tag': 'p',
+            'children': ['⚠️ Contains adult content (R-18) / 成人内容']
+        })
+    if tags:
+        tag_list = [t.strip() for t in tags.split(',') if t.strip()]
+        if tag_list:
+            nodes.append({
+                'tag': 'p',
+                'children': ['# ' + ' #'.join(tag_list)]
+            })
+    if link and str(link).strip():
+        link = link.strip()
+        nodes.append({
+            'tag': 'p',
+            'children': [
+                'Source: ',
+                {'tag': 'a', 'attrs': {'href': link}, 'children': [link]}
+            ]
+        })
+    return nodes
+
+
+def _publish_gallery_worker(
+    files,
+    title: Optional[str],
+    tags: Optional[str],
+    link: Optional[str],
+    spoiler: Optional[str],
+    token: Optional[str]
+) -> Dict:
+    """
+    Save the uploaded images in order, pack them into a zip, and publish them
+    as a Telegra.ph gallery. Runs off the async event loop because publishing
+    performs synchronous HTTP requests and may wait for rate limits.
+    """
+    tmp_dir = tempfile.mkdtemp(prefix='telepress-gallery-')
+    try:
+        paths = []
+        used_names = set()
+        for index, upload in enumerate(files, start=1):
+            raw_name = os.path.basename(upload.filename or '')
+            filename = raw_name or f'image_{index}.jpg'
+            base, ext = os.path.splitext(filename)
+            candidate = filename
+            counter = 1
+            while candidate in used_names:
+                candidate = f'{base}_{counter}{ext}'
+                counter += 1
+            used_names.add(candidate)
+            dest = os.path.join(tmp_dir, candidate)
+            with open(dest, 'wb') as out:
+                shutil.copyfileobj(upload.file, out)
+            paths.append(dest)
+
+        if not paths:
+            raise ValidationError("No files provided for gallery publishing")
+
+        zip_path = os.path.join(tmp_dir, 'gallery.zip')
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for p in paths:
+                zf.write(p, arcname=os.path.basename(p))
+
+        footer = _build_gallery_footer(tags, link, spoiler)
+        pub_title = title or os.path.splitext(os.path.basename(paths[0]))[0]
+        publisher = get_publisher(token)
+        url = publisher.publish_zip_gallery(
+            zip_path, title=pub_title, footer_nodes=footer
+        )
+        return {'url': url, 'files': len(paths)}
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
 @app.get("/")
 def health_check():
@@ -112,6 +206,39 @@ async def publish_file(
     finally:
         if 'tmp_path' in locals() and os.path.exists(tmp_path):
             os.unlink(tmp_path)
+
+@app.post("/publish/gallery", response_model=GalleryPublishResponse)
+async def publish_gallery(
+    files: List[UploadFile] = File(...),
+    title: Optional[str] = Form(None),
+    tags: Optional[str] = Form(None),
+    link: Optional[str] = Form(None),
+    spoiler: Optional[str] = Form(None),
+    token: Optional[str] = Form(None)
+):
+    """
+    Upload multiple image files and publish them as a Telegra.ph gallery.
+
+    Files are packed into a zip in upload order and published with automatic
+    pagination and Prev/Next navigation. The optional `tags` (comma-separated),
+    `link` (source URL) and `spoiler` (truthy for R-18 content) fields are
+    rendered as a footer on the first page. `title` defaults to the first
+    file's name when omitted.
+
+    Compatible with generic multipart delivery clients (e.g. PixivFlow
+    `httpMultipart` targets posting repeated `files` parts).
+    """
+    try:
+        result = await run_in_threadpool(
+            _publish_gallery_worker, files, title, tags, link, spoiler, token
+        )
+        return GalleryPublishResponse(
+            url=result['url'], files=result['files']
+        )
+    except TelePressError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 def start_server(host="0.0.0.0", port=8000):
     """Start the TelePress API server."""
