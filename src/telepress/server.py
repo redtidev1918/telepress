@@ -1,5 +1,5 @@
 try:
-    from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends
+    from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Header, Security
     from pydantic import BaseModel
     from starlette.concurrency import run_in_threadpool
 except ImportError as exc:  # pragma: no cover - exercised only without [api]
@@ -9,6 +9,7 @@ except ImportError as exc:  # pragma: no cover - exercised only without [api]
     ) from exc
 from typing import Optional, List, Dict
 import os
+import hmac
 import shutil
 import tempfile
 import zipfile
@@ -20,6 +21,29 @@ app = FastAPI(
     description="REST API to convert text, markdown, images, and zips to Telegraph pages.",
     version="0.1.0"
 )
+
+# —— 请求级鉴权（可选）：设置环境变量 TELEPRESS_API_KEY 后，/publish/* 需要携带
+#    `Authorization: Bearer <key>` 或 `X-TelePress-Key: <key>`。未设置时保持开放（向后兼容），
+#    但请勿把无鉴权的发布接口暴露公网——建议绑 127.0.0.1 / 内网或 Docker 网络。
+def require_api_key(
+    authorization: Optional[str] = Header(None),
+    x_telepress_key: Optional[str] = Header(None, alias="X-TelePress-Key"),
+):
+    expected = os.environ.get("TELEPRESS_API_KEY", "").strip()
+    if not expected:
+        return True  # 未配置 key：放行（开发/本地场景）
+    presented = None
+    if authorization and authorization.lower().startswith("bearer "):
+        presented = authorization[7:].strip()
+    elif x_telepress_key:
+        presented = x_telepress_key.strip()
+    if not presented or not hmac.compare_digest(presented, expected):
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+    return True
+
+# 所有发布端点共用的鉴权依赖。
+_api_auth = [Security(require_api_key)]
+
 
 # Request Models
 class TextPublishRequest(BaseModel):
@@ -150,7 +174,7 @@ def _publish_gallery_worker(
 def health_check():
     return {"status": "ok", "service": "telepress"}
 
-@app.post("/publish/text", response_model=PublishResponse)
+@app.post("/publish/text", response_model=PublishResponse, dependencies=_api_auth)
 async def publish_text(request: TextPublishRequest):
     """
     Publish raw Markdown/Text content directly.
@@ -174,7 +198,7 @@ async def publish_text(request: TextPublishRequest):
         if 'tmp_path' in locals() and os.path.exists(tmp_path):
             os.unlink(tmp_path)
 
-@app.post("/publish/file", response_model=PublishResponse)
+@app.post("/publish/file", response_model=PublishResponse, dependencies=_api_auth)
 async def publish_file(
     file: UploadFile = File(...),
     title: Optional[str] = Form(None),
@@ -207,7 +231,7 @@ async def publish_file(
         if 'tmp_path' in locals() and os.path.exists(tmp_path):
             os.unlink(tmp_path)
 
-@app.post("/publish/gallery", response_model=GalleryPublishResponse)
+@app.post("/publish/gallery", response_model=GalleryPublishResponse, dependencies=_api_auth)
 async def publish_gallery(
     files: List[UploadFile] = File(...),
     title: Optional[str] = Form(None),

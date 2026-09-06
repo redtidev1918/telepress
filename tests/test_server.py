@@ -407,3 +407,40 @@ class TestGalleryFooterBuilder(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestServerApiKeyAuth(unittest.TestCase):
+    """请求级 Bearer/X-TelePress-Key 鉴权（TELEPRESS_API_KEY）。"""
+
+    def setUp(self):
+        from telepress.server import app
+        self.client = TestClient(app)
+        patcher = patch('telepress.server.TelegraphPublisher')
+        self.MockPublisher = patcher.start()
+        self.addCleanup(patcher.stop)
+        inst = MagicMock()
+        inst.publish.return_value = 'http://telegra.ph/ok'
+        self.MockPublisher.return_value = inst
+
+    def test_no_key_configured_allows(self):
+        os.environ.pop('TELEPRESS_API_KEY', None)
+        r = self.client.post('/publish/text', json={'content': 'hi', 'title': 't'})
+        self.assertIn(r.status_code, (200, 500))  # 未到鉴权拒绝（可能发布内部报错，但不是 401）
+        self.assertNotEqual(r.status_code, 401)
+
+    def test_key_required_when_configured(self):
+        os.environ['TELEPRESS_API_KEY'] = 'secret-key'
+        try:
+            r = self.client.post('/publish/text', json={'content': 'hi', 'title': 't'})
+            self.assertEqual(r.status_code, 401)
+            r2 = self.client.post('/publish/text', json={'content': 'hi', 'title': 't'},
+                                  headers={'Authorization': 'Bearer secret-key'})
+            self.assertNotEqual(r2.status_code, 401)
+            r3 = self.client.post('/publish/text', json={'content': 'hi', 'title': 't'},
+                                  headers={'X-TelePress-Key': 'secret-key'})
+            self.assertNotEqual(r3.status_code, 401)
+            r4 = self.client.post('/publish/text', json={'content': 'hi', 'title': 't'},
+                                  headers={'Authorization': 'Bearer wrong'})
+            self.assertEqual(r4.status_code, 401)
+        finally:
+            os.environ.pop('TELEPRESS_API_KEY', None)
