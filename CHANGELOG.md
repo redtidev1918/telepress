@@ -4,6 +4,13 @@ All notable changes to TelePress are documented in this file. The project uses
 [Semantic Versioning](https://semver.org/) and the changelog is maintained by
 Release Please from Conventional Commits.
 
+## [0.6.0](https://github.com/redtidev1918/telepress/compare/v0.5.0...v0.6.0) (2026-09-07)
+
+
+### Features
+
+* **server:** /publish/* 可选请求级 API key 鉴权（Bearer / X-TelePress-Key） ([4078e61](https://github.com/redtidev1918/telepress/commit/4078e613cc43a8d66eab2aece848b28415939af1))
+
 ## [0.5.0](https://github.com/redtidev1918/telepress/compare/v0.4.0...v0.5.0) (2026-08-30)
 
 
