@@ -70,7 +70,7 @@ telepress-server = "telepress.server:main"
 
 [project.urls]
 Changelog = "https://github.com/redtidev1918/telepress/blob/master/CHANGELOG.md"
-Documentation = "https://github.com/redtidev1918/telepress#readme"
+Documentation = "https://redtidev1918.github.io/telepress/"
 Issues = "https://github.com/redtidev1918/telepress/issues"
 Repository = "https://github.com/redtidev1918/telepress"
 
