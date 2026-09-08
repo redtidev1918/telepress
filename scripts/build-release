@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+rm -rf dist/pypi
+mkdir -p dist/release dist/pypi
+python -m pip install --upgrade build twine
+python -m build --outdir dist/pypi
+python -m twine check dist/pypi/*
+cp dist/pypi/* dist/release/
