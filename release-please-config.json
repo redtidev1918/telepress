@@ -10,7 +10,8 @@
       "include-v-in-tag": true,
       "extra-files": [
         "src/telepress/version.py"
-      ]
+      ],
+      "skip-github-release": true
     }
   }
 }

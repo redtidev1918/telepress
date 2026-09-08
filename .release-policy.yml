@@ -1,0 +1,34 @@
+{
+  "kind": "python-library",
+  "versioning": {
+    "mode": "release-please"
+  },
+  "build": {
+    "test": "python -m pip install --upgrade build twine && python -m pip install -e '.[dev]' && python -m pytest -q",
+    "command": "scripts/build-release",
+    "version_check": "python -c \"import os,zipfile,pathlib; w=list(pathlib.Path('dist/pypi').glob('*.whl')); assert len(w)==1; z=zipfile.ZipFile(w[0]); s=z.read('telepress/version.py').decode(); assert os.environ['RELEASE_VERSION'] in s\""
+  },
+  "assets": {
+    "required": [
+      "*.whl",
+      "*.tar.gz"
+    ],
+    "optional": []
+  },
+  "registries": {
+    "github": {
+      "required": true
+    },
+    "pypi": {
+      "required": true,
+      "packages_dir": "dist/pypi"
+    }
+  },
+  "retention": {
+    "stable": 1,
+    "prerelease": 1,
+    "failed_draft": 2
+  },
+  "checksums": true,
+  "sbom": false
+}
