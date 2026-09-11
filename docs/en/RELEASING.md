@@ -14,7 +14,7 @@ Build and metadata verification
 PyPI Trusted Publishing + GitHub assets
 ```
 
-版本号、CHANGELOG、标签和发布产物都由自动化维护，但真正发版前仍需维护者合并发布 PR。
+Version numbers, the changelog, tags and release artifacts are all maintained by automation, but a maintainer still has to merge the release PR before anything is published.
 
 ## One-time repository setup
 
