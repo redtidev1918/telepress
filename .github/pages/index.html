@@ -13,8 +13,11 @@
     window.$docsify = {
       name: 'TelePress',
       repo: 'redtidev1918/telepress',
-      homepage: 'README_CN.md',
+      homepage: 'README.md',
       loadSidebar: true,
+      alias: {
+        '/.*/_sidebar.md': '/_sidebar.md'
+      },
       subMaxLevel: 2,
       auto2top: true,
       search: { placeholder: '搜索文档…', noData: '没有匹配的结果', depth: 3 }

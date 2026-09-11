@@ -4,34 +4,33 @@
 [![PyPI](https://img.shields.io/pypi/v/telepress.svg)](https://pypi.org/project/telepress/)
 [![Python](https://img.shields.io/pypi/pyversions/telepress.svg)](https://pypi.org/project/telepress/)
 
-[中文文档](README_CN.md)
+**语言 / Language:** 中文 · [English](README.en.md)
 
-TelePress publishes Markdown, plain text, images, and ZIP galleries to
-[Telegraph](https://telegra.ph). It supports automatic pagination, external
-image hosts, image compression, concurrent uploads, and an optional REST API.
+TelePress 用于把 Markdown、纯文本、图片和 ZIP 图集发布到
+[Telegraph](https://telegra.ph)，支持自动分页、外部图床、图片压缩、并发上传和可选的 REST API。
 
-## Requirements
+## 环境要求
 
-- Python 3.10 or newer
-- A Telegraph token, or permission to create one on first use
-- An image-host configuration only when publishing images or galleries
+- Python 3.10 或更高版本
+- Telegraph token；首次使用时也可以自动创建
+- 只有发布图片或图集时才需要配置图床
 
-## Installation
+## 安装
 
 ```bash
 pip install telepress
 
-# Optional REST API
+# 可选：REST API
 pip install "telepress[api]"
 
-# Optional S3-compatible hosts such as AWS S3 and Cloudflare R2
+# 可选：AWS S3、Cloudflare R2 等 S3 兼容图床
 pip install "telepress[s3]"
 
-# Optional YAML configuration files
+# 可选：YAML 配置文件
 pip install "telepress[yaml]"
 ```
 
-Install from source for development:
+从源码安装开发环境：
 
 ```bash
 git clone https://github.com/redtidev1918/telepress.git
@@ -39,97 +38,92 @@ cd telepress
 python -m pip install --editable ".[dev]"
 ```
 
-## Quick start
+## 快速开始
 
-Publish a document:
+发布文档：
 
 ```bash
-telepress article.md --title "My post"
+telepress article.md --title "我的文章"
 
-# The explicit subcommand is equivalent
-telepress publish article.md --title "My post"
+# 显式子命令写法与上面等价
+telepress publish article.md --title "我的文章"
 ```
 
-Publish an image or ZIP gallery after configuring an image host:
+配置图床后发布图片或 ZIP 图集：
 
 ```bash
 telepress configure
 telepress check
-telepress photo.jpg --title "Photo"
-telepress gallery.zip --title "Gallery"
+telepress photo.jpg --title "照片"
+telepress gallery.zip --title "图集"
 ```
 
-Useful publishing options:
+常用参数：
 
 ```bash
-# Override the configured image limit in MiB
+# 临时覆盖图片大小限制，单位 MiB
 telepress gallery.zip --image-size-limit 10
 
-# Keep original images instead of compressing oversized files
+# 不压缩超限图片
 telepress gallery.zip --no-compress
 
-# Use a Telegraph-compatible API endpoint
+# 使用兼容 Telegraph 的自定义 API
 telepress article.md --api-url http://localhost:9009
 ```
 
-Text-only publishing does not load or require an image-host configuration.
-The Telegraph access token is created automatically when needed and stored in
-`~/.telegraph_token` unless one is supplied with `--token`.
+纯文本发布不会加载或要求图床配置。Telegraph token 会在需要时自动创建并保存到
+`~/.telegraph_token`，也可以用 `--token` 显式传入。
 
 ## REST API
 
-Install the optional API dependencies first: `pip install "telepress[api]"`.
+使用前先安装可选 API 依赖：`pip install "telepress[api]"`。
 
 ```bash
 telepress-server --host 127.0.0.1 --port 8000
 ```
 
-Interactive OpenAPI documentation is available at
-`http://127.0.0.1:8000/docs`.
+OpenAPI 交互文档位于 `http://127.0.0.1:8000/docs`。
 
 ```bash
 curl -X POST http://127.0.0.1:8000/publish/text \
   -H "Content-Type: application/json" \
-  -d '{"content":"# Title\n\nBody","title":"Example"}'
+  -d '{"content":"# 标题\n\n正文","title":"示例"}'
 
 curl -X POST http://127.0.0.1:8000/publish/file \
   -F "file=@article.md" \
-  -F "title=Example"
+  -F "title=示例"
 
 curl -X POST http://127.0.0.1:8000/publish/gallery \
   -F "files=@p0.jpg" \
   -F "files=@p1.jpg" \
-  -F "title=Gallery title" \
+  -F "title=相册标题" \
   -F "tags=pixiv, illustration" \
   -F "link=https://www.pixiv.net/artworks/123456" \
   -F "spoiler=true"
 ```
 
-`/publish/gallery` accepts repeated `files` parts plus optional `title`,
-`tags` (comma-separated), `link` (source URL) and `spoiler` (truthy for R-18
-content) form fields. Files are packed into a zip in upload order and
-published with automatic pagination and Prev/Next navigation; `tags`, `link`
-and the R-18 warning are rendered as a footer on the first page. It returns
-`{"ok": true, "url": "...", "files": N}` and is compatible with generic
-multipart delivery clients, e.g. PixivFlow `httpMultipart` targets pointing
-at `http://<telepress-host>:8000/publish/gallery`.
+`/publish/gallery` 接收可重复的 `files` 文件字段，以及可选的 `title`、
+`tags`（逗号分隔）、`link`（来源链接）和 `spoiler`（R-18 内容传真值即可）
+表单字段。文件按上传顺序打包成 zip 后发布为 Telegra.ph 相册，自动分页并
+加上「上一页/下一页」导航；`tags`、`link` 和 R-18 提示会渲染在首页页脚。
+返回 `{"ok": true, "url": "...", "files": N}`，兼容通用 multipart 交付
+客户端，例如 PixivFlow 的 `httpMultipart` 目标指向
+`http://<telepress-host>:8000/publish/gallery`。
 
-Blocking file, compression, and network work is dispatched away from the API
-event loop, so concurrent requests do not serialize on those operations.
+文件读写、图片压缩和同步网络请求会在线程池执行，不会阻塞 API 的异步事件循环。
 
-## Image hosts
+## 图片托管
 
-Supported hosts:
+支持的图床：
 
 - ImgBB
 - Imgur
 - sm.ms
-- S3-compatible storage, including AWS S3, Cloudflare R2, OSS, and MinIO
-- Rclone remotes
-- Custom HTTP upload APIs
+- AWS S3、Cloudflare R2、OSS、MinIO 等 S3 兼容存储
+- Rclone remote
+- 自定义 HTTP 上传 API
 
-Run `telepress configure` for the interactive setup, or create
-`~/.telepress.json`:
+运行 `telepress configure` 可以交互式配置，也可以创建 `~/.telepress.json`：
 
 ```json
 {
@@ -144,7 +138,7 @@ Run `telepress configure` for the interactive setup, or create
 }
 ```
 
-S3-compatible configuration:
+S3 兼容配置：
 
 ```json
 {
@@ -160,18 +154,18 @@ S3-compatible configuration:
 }
 ```
 
-Environment variables override file configuration:
+环境变量的优先级高于配置文件：
 
 ```bash
 export TELEPRESS_IMAGE_HOST_TYPE=imgbb
 export TELEPRESS_IMAGE_HOST_API_KEY=your-key
 ```
 
-Configuration is searched in the following locations:
+配置文件查找顺序：
 
-1. The path passed to `load_config()`
+1. 传给 `load_config()` 的显式路径
 2. `TELEPRESS_CONFIG`
-3. `~/.telepress.json`, `~/.telepress.yaml`, `~/.telepress.yml`
+3. `~/.telepress.json`、`~/.telepress.yaml`、`~/.telepress.yml`
 4. `~/.config/telepress.json`
 
 ## Python API
@@ -179,14 +173,14 @@ Configuration is searched in the following locations:
 ```python
 from telepress import TelegraphPublisher, publish, publish_text
 
-url = publish("article.md", title="My article")
-text_url = publish_text("# Hello\n\nWorld", title="Hello")
+url = publish("article.md", title="我的文章")
+text_url = publish_text("# 标题\n\n正文", title="示例")
 
 publisher = TelegraphPublisher(image_size_limit=10)
-gallery_url = publisher.publish("gallery.zip", title="Gallery")
+gallery_url = publisher.publish("gallery.zip", title="图集")
 ```
 
-Upload images directly:
+直接上传图片：
 
 ```python
 from telepress import ImageUploader
@@ -198,23 +192,20 @@ batch = uploader.upload_batch(["1.jpg", "2.jpg"])
 print(batch.success_rate, batch.get_url_map())
 ```
 
-## Behavior and limits
+## 行为与限制
 
-- Markdown and plain text are converted to Telegraph DOM nodes.
-- Plain text chapter headings such as `Chapter 1` and `第一章` are detected.
-- Large text is split near 10,000-character boundaries and linked with
-  previous/next navigation.
-- Galleries are split at 100 images per page.
-- Images larger than 5 MiB are compressed by default; GIF compression is
-  intentionally skipped.
-- A 2 GiB input safety limit is applied before processing.
-- Duplicate text publications are cached in `~/.telepress_cache.json` by
-  default.
+- Markdown 和纯文本会转换为 Telegraph DOM 节点。
+- 可以识别 `Chapter 1`、`第一章` 等纯文本章节标题。
+- 大文本会在约 10,000 字符边界自动分页，并生成上一页、下一页导航。
+- 图集每 100 张图片分页。
+- 单张图片默认限制为 5 MiB，超限时自动压缩；GIF 不会自动压缩。
+- 处理前会应用 2 GiB 的输入安全上限。
+- 默认使用 `~/.telepress_cache.json` 避免重复发布相同文本。
 
-Supported input extensions include `.txt`, `.md`, `.markdown`, `.rst`,
-`.text`, `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.bmp`, and `.zip`.
+支持 `.txt`、`.md`、`.markdown`、`.rst`、`.text`、`.jpg`、`.jpeg`、
+`.png`、`.gif`、`.webp`、`.bmp` 和 `.zip`。
 
-## Error handling
+## 错误处理
 
 ```python
 from telepress import TelePressError, ValidationError, publish
@@ -222,12 +213,12 @@ from telepress import TelePressError, ValidationError, publish
 try:
     url = publish("article.md")
 except ValidationError as exc:
-    print(f"Invalid input: {exc}")
+    print(f"输入无效：{exc}")
 except TelePressError as exc:
-    print(f"Publishing failed: {exc}")
+    print(f"发布失败：{exc}")
 ```
 
-## Development and releases
+## 开发与发版
 
 ```bash
 python -m pip install --editable ".[dev]"
@@ -236,9 +227,8 @@ python -m build
 python -m twine check dist/*
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution conventions and
-[docs/RELEASING.md](docs/RELEASING.md) for the automated release workflow.
-Notable changes are recorded in [CHANGELOG.md](CHANGELOG.md).
+贡献规范见 [CONTRIBUTING.md](CONTRIBUTING.md)，自动发版的配置和操作步骤见
+[docs/en/RELEASING.md](docs/en/RELEASING.md)，版本变化记录在 [CHANGELOG.md](CHANGELOG.md)。
 
 ## License
 
