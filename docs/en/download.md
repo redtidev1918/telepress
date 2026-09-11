@@ -1,40 +1,16 @@
-# 📥 Download TelePress
+# 📥 Download telepress
 
 **Language / 语言:** [中文](/docs/download.md) · English
 
-TelePress is a Python package **distributed only through PyPI** — there is no per-platform
-installer. See [Releases](https://github.com/redtidev1918/telepress/releases) for version
-history and published artifacts.
+This page is **generated automatically** by GitHub Actions on every release and always points at the latest one.
 
-## Install from PyPI
+## Latest version: `v0.6.1` (2026-09-08)
 
-```bash
-pip install telepress
-```
+👉 [Release notes and checksums](https://github.com/redtidev1918/telepress/releases/tag/v0.6.1)
 
-Optional dependencies are exposed as extras; see the
-[Installation section of the README](/README.en.md#installation) for the exact names.
-
-## Install from source
-
-```bash
-git clone https://github.com/redtidev1918/telepress.git
-cd telepress
-pip install -e .
-```
-
-## Releases
-
-Each release publishes a wheel and a source distribution
-(`telepress-<version>-py3-none-any.whl`, `.tar.gz`) plus checksums:
-
-<https://github.com/redtidev1918/telepress/releases>
-
-## Changelog
-
-See [CHANGELOG](https://github.com/redtidev1918/telepress/blob/master/CHANGELOG.md).
-
-## Related
-
-- [README (English)](/README.en.md)
-- [中文 README](/README.md)
+| Platform | File | Size | Download |
+|---|---|---|---|
+| All platforms | `RELEASE-METADATA.json` | 1 KB | [⬇️ Download](https://github.com/redtidev1918/telepress/releases/download/v0.6.1/RELEASE-METADATA.json) |
+| All platforms | `SHA256SUMS` | 0 KB | [⬇️ Download](https://github.com/redtidev1918/telepress/releases/download/v0.6.1/SHA256SUMS) |
+| All platforms | `telepress-0.6.1-py3-none-any.whl` | 38 KB | [⬇️ Download](https://github.com/redtidev1918/telepress/releases/download/v0.6.1/telepress-0.6.1-py3-none-any.whl) |
+| All platforms | `telepress-0.6.1.tar.gz` | 69 KB | [⬇️ Download](https://github.com/redtidev1918/telepress/releases/download/v0.6.1/telepress-0.6.1.tar.gz) |
