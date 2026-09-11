@@ -53,10 +53,10 @@ Keep the subject imperative, concise, and scoped to one logical change.
 Before requesting review:
 
 - Add or update tests for behavior changes.
-- Update both `README.md` and `README_CN.md` when user-facing behavior changes.
+- Update both `README.md` (Chinese, the default) and `README.en.md` when user-facing behavior changes.
 - Do not edit `src/telepress/version.py` or `CHANGELOG.md` for ordinary pull
   requests; the release pull request manages them.
 - Confirm the complete local test suite passes.
 - Explain compatibility or security implications in the pull request body.
 
-See [docs/RELEASING.md](docs/RELEASING.md) for maintainer release operations.
+See [docs/en/RELEASING.md](docs/en/RELEASING.md) for maintainer release operations.
