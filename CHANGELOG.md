@@ -4,6 +4,15 @@ All notable changes to TelePress are documented in this file. The project uses
 [Semantic Versioning](https://semver.org/) and the changelog is maintained by
 Release Please from Conventional Commits.
 
+## [0.6.2](https://github.com/redtidev1918/telepress/compare/v0.6.1...v0.6.2) (2026-09-12)
+
+
+### Documentation
+
+* 中文设为默认语言，统一双语命名与侧边栏，补齐下载页与英文文档 ([#20](https://github.com/redtidev1918/telepress/issues/20)) ([8221934](https://github.com/redtidev1918/telepress/commit/82219346f9aebe08f5edac0d20573b619bb80570))
+* 显式声明 CDN 壳站点的导航例外 ([#22](https://github.com/redtidev1918/telepress/issues/22)) ([16617e9](https://github.com/redtidev1918/telepress/commit/16617e9a2d0b8f263a12f327059c3e994ff6fb86))
+* 英文发版文档中的中文句子改为英文 ([74e9a59](https://github.com/redtidev1918/telepress/commit/74e9a59c31bc0df0f085feb85c206116401f2f21))
+
 ## [0.6.1](https://github.com/redtidev1918/telepress/compare/v0.6.0...v0.6.1) (2026-09-08)
 
 
